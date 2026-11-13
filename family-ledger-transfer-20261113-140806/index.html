@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>家庭記帳手冊</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+<header>
+  <div class="header-copy"><h1>家庭記帳手冊</h1><p id="identity"></p></div>
+  <div class="family-illustration" aria-hidden="true">
+    <span class="family-sparkle">✦</span>
+    <span class="family-person family-mom">👩🏻</span>
+    <span class="family-person family-dad">👨🏻</span>
+    <span class="family-person family-older">👧🏻</span>
+    <span class="family-person family-younger">👧🏻</span>
+    <span class="family-heart">♥</span>
+  </div>
+  <button id="logout" class="secondary" hidden>登出</button>
+</header>
+<main id="main"></main>
+<p id="notice" role="status" aria-live="polite"></p>
+</body>
+</html>
