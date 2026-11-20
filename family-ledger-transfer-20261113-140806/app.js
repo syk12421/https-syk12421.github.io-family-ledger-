@@ -13,6 +13,8 @@ const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({
 })[char]);
 const options = (values, selected) => values.map(value =>
   `<option ${value === selected ? 'selected' : ''}>${escape(value)}</option>`).join('');
+const browserMode = document.documentElement.dataset.ledgerMode === 'browser';
+let browserApi;
 let user, shared, entries = [], month = today().slice(0, 7), preview, refreshId = 0;
 let selectedCategory;
 const previousMonth = month => {
@@ -22,6 +24,7 @@ const previousMonth = month => {
 };
 
 async function api(path, input) {
+  if (browserMode) return browserApi(path, input);
   const response = await fetch('/api/' + path, input === undefined ? {} : {
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(input)
   });
@@ -119,20 +122,20 @@ function editor(row) {
 }
 
 function dashboard() {
-  $('#identity').textContent = shared ? '共用帳本・免登入' : user + '的帳本';
+  $('#identity').textContent = browserMode ? '帳本僅儲存在目前的瀏覽器' : shared ? '共用帳本・免登入' : user + '的帳本';
   $('#logout').hidden = shared;
   main.innerHTML = `
     <div class="toolbar"><label>帳本月份<input id="month" type="month" value="${month}"></label>
     ${user === '媽媽' ? `<label>查看帳本<select id="owner">${options([...owners,'全家明細'], shared ? '全家明細' : user)}</select></label>` : ''}</div>
     ${user === '媽媽' ? '<section id="reportSection"><div id="report"></div><div class="actions"><button id="printReport" disabled>產出家庭損益表</button><button id="export" class="secondary" disabled>匯出本月 CSV</button></div></section>' : ''}
     <section><h2 id="editorTitle"></h2><form id="entry"></form></section>
-    <section><h2>拍照辨識</h2><form id="photo">
+    ${browserMode ? '' : `<section><h2>拍照辨識</h2><form id="photo">
       <div class="grid">
         <label>照片類型<select name="type">${options(people.slice(0,2).includes(user) ? ['信用卡帳單','手寫記帳'] : ['手寫記帳'])}</select></label>
         <label>拍照或選擇照片<input type="file" name="image" accept="image/jpeg,image/png,image/webp" required></label>
       </div>
       <button>辨識照片</button>
-    </form><div id="review"></div></section>
+    </form><div id="review"></div></section>`}
     <section id="details"><div class="toolbar"><h2 id="detailsTitle">收支明細</h2>
     <button id="clearCategory" class="secondary" hidden>清除分類篩選</button></div><div id="entries" class="scroll"></div></section>`;
   selectedCategory = undefined;
@@ -152,6 +155,7 @@ function dashboard() {
     try { await refresh(); } catch (error) { message(error.message); }
   };
   if ($('#owner')) $('#owner').onchange = renderEntries;
+  if (browserMode) return;
   submit($('#photo'), async ({type, image}) => {
     if (image.size > 6_500_000) throw new Error('請選擇小於 6.5 MB 的照片');
     const review = $('#review');
@@ -314,6 +318,10 @@ $('#logout').onclick = async () => {
 };
 
 try {
+  if (browserMode) {
+    const { createBrowserApi } = await import('./browser-ledger.js');
+    browserApi = createBrowserApi({people, owners, kinds, methods});
+  }
   const status = await api('status');
   shared = status.shared;
   user = status.user;
