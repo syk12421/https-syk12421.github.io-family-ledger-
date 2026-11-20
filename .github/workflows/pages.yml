@@ -38,13 +38,28 @@ jobs:
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
-          test -n "$PAGE_URL"
-          for path in "" app.js style.css browser-ledger.js; do
-            file="${path:-index.html}"
-            url="${PAGE_URL%/}/$path?v=$GITHUB_SHA"
-            curl --fail --silent --show-error --location \
+          public_url="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/"
+          if [[ "${PAGE_URL%/}/" != "$public_url" ]]; then
+            echo "::error::GitHub deployed to $PAGE_URL instead of $public_url"
+            exit 1
+          fi
+
+          check_page() {
+            local url="$1" expected="$2" actual="$RUNNER_TEMP/pages-check"
+            curl --fail --silent --show-error \
               --retry 6 --retry-all-errors --retry-delay 5 --max-time 15 \
-              "$url" --output "$RUNNER_TEMP/ledger-$file"
-            cmp "_site/$file" "$RUNNER_TEMP/ledger-$file"
-            echo "Verified $file"
+              --write-out '%{http_code} %{url_effective}\n' "$url" --output "$actual"
+            if [[ "$expected" == "landing" ]]; then
+              grep -Fq '<title>家庭記帳手冊</title>' "$actual"
+            else
+              cmp "_site/$expected" "$actual"
+            fi
+          }
+
+          for file in index.html app.js style.css browser-ledger.js; do
+            check_page "$public_url$file?v=$GITHUB_SHA" "$file"
           done
+          check_page "$public_url" landing
+          check_page "${public_url}?v=${GITHUB_SHA:0:7}" index.html
+          printf 'Public homepage: %s\n\nDirect HTML: %sindex.html?v=%s\n' \
+            "$public_url" "$public_url" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
