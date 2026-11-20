@@ -1,6 +1,18 @@
 export function createBrowserApi({people, owners, kinds, methods}) {
   const storageKey = 'family-ledger:v1:' + new URL('.', import.meta.url).pathname;
-  const read = () => JSON.parse(localStorage.getItem(storageKey) ?? '[]');
+  const read = () => {
+    let value;
+    try {
+      value = localStorage.getItem(storageKey);
+    } catch {
+      throw new Error('目前的瀏覽器無法存取帳本資料。請在 Safari、Chrome 或 Firefox 的一般分頁開啟。');
+    }
+    try {
+      return JSON.parse(value ?? '[]');
+    } catch {
+      throw new Error('無法讀取這個瀏覽器已儲存的帳本。');
+    }
+  };
   const fail = (status, message) => Object.assign(new Error(message), {status});
 
   return async function browserApi(path, input) {

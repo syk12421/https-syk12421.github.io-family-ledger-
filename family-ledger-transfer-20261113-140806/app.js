@@ -317,7 +317,7 @@ $('#logout').onclick = async () => {
   } catch (error) { message(error.message); }
 };
 
-try {
+async function start() {
   if (browserMode) {
     const { createBrowserApi } = await import('./browser-ledger.js');
     browserApi = createBrowserApi({people, owners, kinds, methods});
@@ -327,5 +327,10 @@ try {
   user = status.user;
   if (user) { dashboard(); await refresh(); }
   else auth(status.setup);
-} catch (error) { message(error.message); }
+}
 
+start().catch(error => {
+  main.innerHTML = '<section role="alert"><h2>無法載入帳本</h2><p class="alert"></p><button type="button">重新載入</button></section>';
+  main.querySelector('p').textContent = error.message;
+  main.querySelector('button').onclick = () => location.reload();
+});

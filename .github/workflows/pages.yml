@@ -34,3 +34,17 @@ jobs:
           path: _site
       - uses: actions/deploy-pages@v4
         id: deployment
+      - name: Verify public site
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          test -n "$PAGE_URL"
+          for path in "" app.js style.css browser-ledger.js; do
+            file="${path:-index.html}"
+            url="${PAGE_URL%/}/$path?v=$GITHUB_SHA"
+            curl --fail --silent --show-error --location \
+              --retry 6 --retry-all-errors --retry-delay 5 --max-time 15 \
+              "$url" --output "$RUNNER_TEMP/ledger-$file"
+            cmp "_site/$file" "$RUNNER_TEMP/ledger-$file"
+            echo "Verified $file"
+          done
