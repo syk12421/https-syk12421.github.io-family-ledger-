@@ -23,15 +23,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      - name: Prepare static site
+      - uses: actions/jekyll-build-pages@v1
+        with:
+          source: .
+          destination: ./_site
+      - name: Stage public files
         run: |
-          app=family-ledger-transfer-20261113-140806
-          mkdir -p _site
-          cp "$app"/{index.html,style.css,app.js,browser-ledger.js} _site/
-          sed -i 's/<html lang="zh-Hant">/<html lang="zh-Hant" data-ledger-mode="browser">/' _site/index.html
+          mkdir -p _publish
+          cp _site/{index.html,style.css,app.js,browser-ledger.js} _publish/
+          test ! -e _site/family-ledger-transfer-20261113-140806
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: _publish
       - uses: actions/deploy-pages@v4
         id: deployment
       - name: Verify public site
@@ -52,7 +55,7 @@ jobs:
             if [[ "$expected" == "landing" ]]; then
               grep -Fq '<title>家庭記帳手冊</title>' "$actual"
             else
-              cmp "_site/$expected" "$actual"
+              cmp "_publish/$expected" "$actual"
             fi
           }
 
@@ -61,5 +64,24 @@ jobs:
           done
           check_page "$public_url" landing
           check_page "${public_url}?v=${GITHUB_SHA:0:7}" index.html
-          printf 'Public homepage: %s\n\nDirect HTML: %sindex.html?v=%s\n' \
+          private_path=family-ledger-transfer-20261113-140806/data/ledger.sqlite
+          status=$(curl --head --silent --show-error --max-time 15 --output /dev/null \
+            --write-out '%{http_code}' "$public_url$private_path?v=$GITHUB_SHA")
+          if [[ "$status" != 404 ]]; then
+            echo "::error::The SQLite path returned HTTP $status instead of 404"
+            exit 1
+          fi
+          printf 'Public homepage: %s\n\nDirect ledger: %sindex.html?v=%s\n' \
             "$public_url" "$public_url" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Open the public ledger in Chrome
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          google-chrome --headless --no-sandbox --disable-dev-shm-usage \
+            --user-data-dir="$RUNNER_TEMP/pages-chrome" --remote-debugging-port=9222 about:blank &
+          chrome_pid=$!
+          trap 'kill "$chrome_pid" 2>/dev/null || true' EXIT
+          timeout 35s node .github/scripts/verify-pages.mjs 9222 "${PAGE_URL%/}/index.html?v=$GITHUB_SHA"

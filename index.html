@@ -1,0 +1,5 @@
+---
+layout: none
+---
+{%- capture ledger -%}{% include_relative family-ledger-transfer-20261113-140806/index.html %}{%- endcapture -%}
+{{- ledger | replace: '<html lang="zh-Hant">', '<html lang="zh-Hant" data-ledger-mode="browser">' -}}
